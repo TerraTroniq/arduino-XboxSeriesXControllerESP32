@@ -33,6 +33,7 @@ enum class ConnectionState : uint8_t {
   WaitingForFirstNotification = 1,
   Found = 2,
   Scanning = 3,
+  Idle = 4,
 };
 
 class ClientCallbacks : public NimBLEClientCallbacks {
@@ -85,11 +86,18 @@ class ScanCallbacks : public NimBLEScanCallbacks {
  public:
   ScanCallbacks(String strTargetDeviceAddress,
                 ConnectionState* pConnectionState) {
-    if (strTargetDeviceAddress != "") {
-      this->targetDeviceAddress =
-          new NimBLEAddress(strTargetDeviceAddress.c_str(), 0);
-    }
+    SetTargetDeviceAddress(strTargetDeviceAddress);
     this->pConnectionState = pConnectionState;
+  }
+
+  void SetTargetDeviceAddress(String strTargetDeviceAddress) {
+    if (targetDeviceAddress != nullptr) {
+      delete targetDeviceAddress;
+      targetDeviceAddress = nullptr;
+    }
+    if (strTargetDeviceAddress != "") {
+      targetDeviceAddress = new NimBLEAddress(strTargetDeviceAddress.c_str(), 0);
+    }
   }
 
  private:
@@ -117,8 +125,7 @@ class ScanCallbacks : public NimBLEScanCallbacks {
         (targetDeviceAddress == nullptr &&
          advertisedDevice->getAppearance() == controllerAppearance &&
          (strcmp(pHex.c_str(), controllerManufacturerDataNormal.c_str()) == 0 ||
-          strcmp(pHex.c_str(), controllerManufacturerDataSearching.c_str()) ==
-              0) &&
+          strcmp(pHex.c_str(), controllerManufacturerDataSearching.c_str()) == 0) &&
          advertisedDevice->getServiceUUID().equals(uuidServiceHid)))
     // if (advertisedDevice->isAdvertisingService(uuidServiceHid))
     {
@@ -152,6 +159,17 @@ class Core {
   uint8_t battery = 0;
   static const int deviceAddressLen = 6;
   uint8_t deviceAddressArr[deviceAddressLen];
+
+  void SetTargetDeviceAddress(String targetDeviceAddress) {
+    scanCBs->SetTargetDeviceAddress(targetDeviceAddress);
+  }
+
+  void SearchDevice() {
+    if (pConnectedClient != nullptr) {
+      pConnectedClient->disconnect();
+    }
+    connectionState = ConnectionState::Scanning;
+  }
 
   void begin() {
     // NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
@@ -202,7 +220,7 @@ class Core {
   }
 
   void onLoop() {
-    if (!isConnected()) {
+    if (!isConnected() && connectionState != ConnectionState::Idle) {
       receivedNotificationAt = 0;
       receivedBatteryAt = 0;
       if (advDevice != nullptr) {
@@ -261,7 +279,7 @@ class Core {
   unsigned long getReceiveBatteryAt() { return receivedBatteryAt; }
 
  private:
-  ConnectionState connectionState = ConnectionState::Scanning;
+  ConnectionState connectionState = ConnectionState::Idle;
   unsigned long receivedNotificationAt = 0;
   unsigned long receivedBatteryAt = 0;
   uint32_t msScanTime = 4000; /** 0 = scan forever */
@@ -388,8 +406,7 @@ class Core {
   }
 
   bool afterConnect(NimBLEClient* pClient) {
-    memcpy(deviceAddressArr, pClient->getPeerAddress().getBase(),
-           deviceAddressLen);
+    memcpy(deviceAddressArr, pClient->getPeerAddress().getVal(), deviceAddressLen);
     for (auto pService : pClient->getServices(true)) {
       auto sUuid = pService->getUUID();
       if (!sUuid.equals(uuidServiceHid) && !sUuid.equals(uuidServiceBattery)) {
