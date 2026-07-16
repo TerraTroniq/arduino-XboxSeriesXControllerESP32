@@ -493,14 +493,14 @@ class Core {
   void notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic,
                 uint8_t* pData, size_t length, bool isNotify) {
     auto sUuid = pRemoteCharacteristic->getRemoteService()->getUUID();
-    if (connectionState != ConnectionState::Connected) {
-#ifdef XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL
-      XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL.println(
-          "Received first notification");
-#endif
-      connectionState = ConnectionState::Connected;
-    }
     if (sUuid.equals(uuidServiceHid)) {
+      if (connectionState != ConnectionState::Connected) {
+#ifdef XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL
+        XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL.println(
+            "Received first notification");
+#endif
+        connectionState = ConnectionState::Connected;
+      }
 #ifdef XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL
       static bool isPrinting = false;
       static unsigned long printedAt = 0;
