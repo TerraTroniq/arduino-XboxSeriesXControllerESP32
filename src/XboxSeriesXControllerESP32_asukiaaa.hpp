@@ -524,8 +524,9 @@ class Core {
       }
       XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL.println("");
 #endif
-      xboxNotif.update(pData, length);
-      receivedNotificationAt = millis();
+      if (xboxNotif.update(pData, length) == 0) {
+        receivedNotificationAt = millis();
+      }
 #ifdef XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL
       // XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL.print(xboxNotif.toString());
       printedAt = millis();
