@@ -10,6 +10,10 @@
 const unsigned long printInterval = 100UL;
 #endif
 
+#define XBOX_BLE_INTERVAL   BLE_GAP_CONN_ITVL_MS(25) // 25ms
+#define XBOX_BLE_LATENCY    0
+#define XBOX_BLE_TIMEOUT    BLE_GAP_SUPERVISION_TIMEOUT_MS(500) // 500ms
+
 namespace XboxSeriesXControllerESP32_asukiaaa {
 
 static NimBLEUUID uuidServiceGeneral("1801");
@@ -48,7 +52,6 @@ class ClientCallbacks : public NimBLEClientCallbacks {
     XBOX_SERIES_X_CONTROLLER_DEBUG_SERIAL.println("Connected");
 #endif
     *pConnectionState = ConnectionState::WaitingForFirstNotification;
-    // pClient->updateConnParams(120,120,0,60);
   }
 
   void onDisconnect(NimBLEClient* pClient, int reason) override {
@@ -78,6 +81,11 @@ class ClientCallbacks : public NimBLEClientCallbacks {
       NimBLEDevice::getClientByHandle(connInfo.getConnHandle())->disconnect();
       return;
     }
+  }
+
+  bool onConnParamsUpdateRequest(NimBLEClient* pClient, const ble_gap_upd_params* params) override {
+    // This rejects the Xbox controllers attempt to force its own 2.56s timeout
+    return false;
   }
 };
 
@@ -332,6 +340,7 @@ class Core {
     if (NimBLEDevice::getCreatedClientCount()) {
       pClient = NimBLEDevice::getClientByPeerAddress(advDevice->getAddress());
       if (pClient) {
+        pClient->setConnectionParams(XBOX_BLE_INTERVAL, XBOX_BLE_INTERVAL, XBOX_BLE_LATENCY, XBOX_BLE_TIMEOUT);
         pClient->connect();
       }
     }
@@ -353,14 +362,7 @@ class Core {
 #endif
 
       // default values
-      // pClient->setConnectionParams(
-      //     BLE_GAP_INITIAL_CONN_ITVL_MIN, BLE_GAP_INITIAL_CONN_ITVL_MAX,
-      //     BLE_GAP_INITIAL_CONN_LATENCY, BLE_GAP_INITIAL_SUPERVISION_TIMEOUT,
-      //     16, 16);
-      // pClient->setConnectionParams(
-      //     BLE_GAP_INITIAL_CONN_ITVL_MIN, BLE_GAP_INITIAL_CONN_ITVL_MAX,
-      //     BLE_GAP_INITIAL_CONN_LATENCY, BLE_GAP_INITIAL_SUPERVISION_TIMEOUT,
-      //     100, 100);
+      pClient->setConnectionParams(XBOX_BLE_INTERVAL, XBOX_BLE_INTERVAL, XBOX_BLE_LATENCY, XBOX_BLE_TIMEOUT);
       pClient->setClientCallbacks(clientCBs, true);
       pClient->connect(advDevice, true);
     }
@@ -380,6 +382,7 @@ class Core {
       // pClient->disconnect();
       delay(retryIntervalMs);
       // Serial.println(pClient->toString().c_str());
+      pClient->setConnectionParams(XBOX_BLE_INTERVAL, XBOX_BLE_INTERVAL, XBOX_BLE_LATENCY, XBOX_BLE_TIMEOUT);
       pClient->connect(true);
       --retryCount;
     }
